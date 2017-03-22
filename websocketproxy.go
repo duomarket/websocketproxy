@@ -155,13 +155,17 @@ func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	defer connPub.Close()
 
 	errc := make(chan error, 2)
+	ready := make(chan bool)
 	cp := func(dst io.Writer, src io.Reader) {
+		ready <- true
 		_, err := io.Copy(dst, src)
 		errc <- err
 	}
 
 	// Start our proxy now, everything is ready...
-	go cp(connBackend.UnderlyingConn(), connPub.UnderlyingConn())
 	go cp(connPub.UnderlyingConn(), connBackend.UnderlyingConn())
+	<-ready
+	go cp(connBackend.UnderlyingConn(), connPub.UnderlyingConn())
+	<-ready
 	<-errc
 }

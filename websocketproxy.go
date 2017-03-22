@@ -2,7 +2,6 @@
 package websocketproxy
 
 import (
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -155,17 +154,27 @@ func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	defer connPub.Close()
 
 	errc := make(chan error, 2)
-	ready := make(chan bool)
-	cp := func(dst io.Writer, src io.Reader) {
-		ready <- true
-		_, err := io.Copy(dst, src)
-		errc <- err
-	}
 
 	// Start our proxy now, everything is ready...
-	go cp(connPub.UnderlyingConn(), connBackend.UnderlyingConn())
-	<-ready
-	go cp(connBackend.UnderlyingConn(), connPub.UnderlyingConn())
-	<-ready
+	go cp(connBackend, connPub, errc)
+	go cp(connPub, connBackend, errc)
 	<-errc
+}
+
+func cp(dst *websocket.Conn, src *websocket.Conn, errc chan error) {
+	for {
+		mt, message, err := src.ReadMessage()
+		if err != nil {
+			log.Printf("websocketproxy: read error (likely stream close) %s\n")
+			errc <- err
+			return
+		}
+		err = dst.WriteMessage(mt, message)
+		if err != nil {
+			log.Printf("websocketproxy: write error %s\n", err)
+			errc <- err
+			return
+		}
+	}
+
 }

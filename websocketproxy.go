@@ -126,6 +126,7 @@ func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	connBackend, resp, err := dialer.Dial(backendURL.String(), requestHeader)
 	if err != nil {
 		log.Printf("websocketproxy: couldn't dial to remote backend url %s\n", err)
+		http.Error(rw, "couldn't dial to remote peer", http.StatusInternalServerError)
 		return
 	}
 	defer connBackend.Close()
@@ -149,6 +150,7 @@ func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	connPub, err := upgrader.Upgrade(rw, req, upgradeHeader)
 	if err != nil {
 		log.Printf("websocketproxy: couldn't upgrade %s\n", err)
+		http.Error(rw, "couldn't upgrade incoming connection", http.StatusInternalServerError)
 		return
 	}
 	defer connPub.Close()
